@@ -1,0 +1,186 @@
+Retail Inventory Availability and Stockout Risk Analysis Dashboard
+
+Business Objective : 
+Ensure continuous product availability by identifying inventory shortages, monitoring stockout risks and 
+preventing potential revenue losses.
+
+Business Problems :
+1. How much inventory is actually available?
+2. Which products are out of stock?
+3. Which products are approaching stockout?
+4. How many days will the current inventory last?
+5. Which categories and warehouses faces highest stockout risks?
+6. Which Products may runout before supplier delivery?
+7. How much potential revenue is at risk due to insufficient inventory?
+
+
+
+Datasets(.csv):
+	1. Product_Master
+	2. Warehouse_Master
+	3. Supplier_Master
+	4. Inventory_snapshot --> Inventory availability at different timestamp
+	5. sales_transactions --> day-to-day sales
+	6. purchase_orders --> Products ordered to supplier to replenish inventory
+
+
+
+Data Cleaning :
+
+1. Product_Master Table
+	i. Trim, clean and capitalize all text columns.
+	ii. Make Product_id, primary_supplier_id, approved_supplier_id column uppercase.
+	iii. Make blank text as unknown for all text columns except keys.
+	iv. Delete Duplicate rows.
+	v. Delete duplicate or blank cells if available in product_id.
+	
+2. Warehouse_Master Table
+	i. Trim, clean and capitalize all text columns.
+	ii. Make Warehouse_id column uppercase.
+	iii. Make blank text as unknown for all text columns except keys.
+	iv. Delete Duplicate rows.
+	v. Delete duplicate or blank cells if available in Warehouse_id.
+
+3. Supplier_Master Table
+	i. Trim, clean and capitalize all text columns.
+	ii. Make Supplier_id column uppercase.
+	iii. Make blank text as unknown for all text columns except keys.
+	iv. Delete Duplicate rows.
+	v. Delete duplicate or blank cells if available in product_id.
+	vi. Supplier_Reliability_pct column has inconsistent values like 97, 0.95 etc. Correct it by make a custom column.
+
+4. Inventory_Snapshot Table
+	i. Trim, clean and make uppercase product_id, warehouse_id columns.
+	ii. Delete duplicate records or duplicate {snapshot_date, product_id, warehouse_id} combination.
+	iii. Opening_stock + received_stock - units_sold + stock_adjustment = closing_stock.
+	iv. Closing_stock - reserved_stock - damaged_stock = available_stock
+	v. Make all null stock_adjustment_units as 0. (inc. or dec. in stock_adjustment occur from stock_corrections, counting_errors, returns, write-offs etc)
+	vi. Create a new custom column called Days_of_Cover. (DOC = Available_stock/Avg_Daily_Sales) where Avg_Daily_Sales = (units_sold/30). Exclude those columns which have 0 unit sold.
+	vii. Bring avg_lead_time_days from supplier_table to inventory_snapshot through product_table Using Merge_queries.
+		match product_id from inventory to product_id from product_table. match primary_supplier_id from product_table to supplier_table. take avg_lead_time_days from supplier table and put in into inventory table.
+	viii. Create a new column called "Stock_Risk_Level" and put the formula 
+		if [available_stock]<0 --> Out of stock, 
+		if (days_of_cover < supplier_delivery_time) or (available_quantity < reorder_point_units) --> High
+		if (days_of_cover = supplier_delivery_time) or (available_quantity = reorder_point_units) --> Moderate
+		else --> Low
+	ix. Put Selling_price_INR from product_table to inventory_table through merge_queries.
+	x. Create another custom column called "Revenue_at_risk" and use the formula max(0,(avg_lead_time_days-days_of_cover))*(units_sold/30)*selling_price
+
+5. Sales_Transactions Table
+	i. Trim, clean and capitalize all text columns.
+	ii. Make Transaction_id, product_id, warehouse_id columns as uppercase.
+	iii. Remove duplicate rows or duplicate transaction ids.
+
+6. Purchase_Orders Table
+	i. Trim, clean and capitalize all text columns.
+	ii. Make PO_id, supplier_id, product_id, warehouse_id columns as uppercase.
+	iii. Some Actual_delivery_dates are null because their PO_Status is open/Not received yet. Keep null as it is.
+	iv. Remove Duplicate rows or duplicate PO_ids.
+
+
+
+Data Modelling :
+	1. Product_Master --> Inventory_Snapshot <-- Warehouse_Master
+	2. Product_Master --> Sales_Transactions <-- Warehouse_Master
+	3. Product_Master --> Purchase_order <-- Warehouse_Master
+	4. Supplier_Master --> Purchase_order
+
+-----------------------------------------------------------------------------------------------------------------------------------------------
+
+
+KPIs : (All are taken from Inventory_snapshot table)
+	1. Total Available Stocks --> Sum from Available_stock_units column.
+	2. Out of stock products --> Distinct count of product filtered on "Out of Stock" of stock risk level column.
+	3. High Risk Products --> Distinct count of product filtered on "High" of stock risk level column.
+	4. Avg Days of Cover --> Average of Days_of_cover column. Filter days_of_cover column and exclude blank from calculation.
+	5. Avg Supplier Delivery Days --> Do Average of Avg_lead_time_days column.
+	6. Estimated Revenue at Risk --> Sum from Estimated_Revenue_at_Risk column.
+
+Note: i) Give proper name of KPI pivot tables and connect each toall slicers from slicers --> Report Connections
+	ii) Use helper cell for KPI results to make kpi values dynamic within shape in dashboard.
+
+
+Slicers :
+	1. Year --> 2025,2026
+	2. Month --> Use slicer_settings and hide if data is not available because 2025(May-Dec), 2026(Jan-Oct)
+	3. Product Category
+	4. Warehouse
+
+
+Charts :
+	1. Monthly stock-out trend 
+		Do count of product_id across different snapshot years and months, filter stock_risk_level as "Out of Stock".
+		Give proper name to pivot table and Connect Product category and warehouse slicers to it.
+		Use line chart.
+
+	2. Stock risk distribution
+		Do count of product_id based on different stock_risk_level.
+		Show values as % of grand total and use Donut chart.
+		Give proper name to pivot table and Connect all slicers to it.
+
+	3. Product Category-wise Avg. Days of Cover
+		Do average of days of cover column from inventory_snapshot table based on product categories from product_master_table.
+		sort the values in descending order and use vertical bar chart.
+		Give proper name to pivot table and connect all slicers except product_category.	
+
+	4. Warehouse-wise Inventory Demand stock availability comparison
+		Do sum of available_stock_units from inventory_snapshot table and sum of units_sold based on warehouse name from warehouse_master_table.
+		Use vertical clustered bar chart.
+		Give proper name to pivot table and connect to all slicers except warehouse.
+	
+	5. Top 10 products by stock-out Occurrances
+		Do count of product_id from inventory_snapshot table, based on Product_name from product_master table.
+		Apply filter in stock_risk_level as "Out of stock".
+		Use value_filter in product_name column in pivot, take top 10 items based on count of product_id.
+		Sort product_name column in pivot, go to more sort option --> Choose asc order based on count of product_id.
+		Use horizontal bar chart.
+		Give a proper name to the pivot table and connect warehouse and product_category slicers to it.
+
+	6. Top-10 products with highest stock-out risk frequency
+		Do count of product_id from inventory_snapshot table, based on Product_name from product_master table.
+		Apply filter in stock_risk_level as "High".
+		Use value_filter in product_name column in pivot, take top 10 items based on count of product_id.
+		Sort product_name column in pivot, go to more sort option --> Choose asc order based on count of product_id.
+		Use horizontal bar chart.
+		Give a proper name to the pivot table and connect warehouse and product_category slicers to it.
+
+	7. Inventory demand vs stock received trend
+		Do sum of units sold and sum of stock received units across different snapshot years and months.
+		Give proper name to pivot table and Connect Product category and warehouse slicers to it.
+		Use vertical clustered bar chart to it.
+
+	8. Revenue at risk by product category
+		Do sum of revenue at risk based on product category.
+		sort the values in asc order.
+		Take the values out of pivot table referenced with pivot table values and do custom number format.
+		Use vertical clustered bar chart.
+		Give a proper name to the pivot table and connect all slicers except product category.
+
+Tables :
+	1. Stock-out risk action matrix --> Make simple table and tell stock_risk_level wise recommended actions.
+	
+	2. Stock-out prevention priority list
+		choose value filter in product_id column in pivot table as top 10 items based on estimated revenue at risk.
+		Sort product_id column in pivot table by go to more sort option --> descending based on estimated revenue at risk.
+		Give proper name to the pivot table and connect to all slicers.
+
+
+
+	
+---------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  

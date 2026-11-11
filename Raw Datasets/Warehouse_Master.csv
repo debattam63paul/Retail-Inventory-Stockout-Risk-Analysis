@@ -1,0 +1,8 @@
+﻿Warehouse_ID,Warehouse_Name,City,State,Warehouse_Capacity_Units,Warehouse_Type,Warehouse_Status
+WH001,Kolkata Central DC,Kolkata,West Bengal,"18,500",Regional Distribution,Active
+WH002,Delhi NCR Fulfilment Hub,Delhi,Delhi,26000,,Active
+ WH003 ,Mumbai West DC,Mumbai,Maharashtra,31000,Regional Distribution,Active
+WH004,Bengaluru South Hub, BENGALURU ,Karnataka,22500,Regional Distribution,Active
+WH005,Nagpur Transit Warehouse,Nagpur,Maharashtra,"12,500",Transit,Active
+WH006,Chennai Service Warehouse, CHENNAI ,Tamil Nadu,9800,Service & Spares,Active
+WH005,Nagpur Transit Warehouse,Nagpur,Maharashtra,"12,500",Transit,Active
